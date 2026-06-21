@@ -1,0 +1,895 @@
+import React, { useState, useMemo } from 'react';
+
+// Iconos vectoriales personalizados para mantener la aplicación ligera y autónoma
+const Icons = {
+  Calculator: () => (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth="2" />
+      <line x1="9" y1="9" x2="15" y2="9" strokeWidth="2" strokeLinecap="round" />
+      <line x1="9" y1="13" x2="15" y2="13" strokeWidth="2" strokeLinecap="round" />
+      <line x1="9" y1="17" x2="15" y2="17" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ),
+  TrendingDown: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+    </svg>
+  ),
+  Table: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  ChartBar: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  ),
+  Compare: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
+  Plus: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+    </svg>
+  ),
+  Trash: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  ),
+  Info: () => (
+    <svg className="w-4 h-4 text-blue-500 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  Download: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  )
+};
+
+export default function App() {
+  // --- Estados Principales ---
+  const [loanAmount, setLoanAmount] = useState(10000);
+  const [annualRate, setAnnualRate] = useState(12); // en porcentaje (%)
+  const [term, setTerm] = useState(12); // Duración
+  const [termUnit, setTermUnit] = useState('meses'); // 'meses' o 'años'
+  const [frequency, setFrequency] = useState('mensual'); // quincenal, mensual, trimestral, semestral, anual
+  const [system, setSystem] = useState('frances'); // frances, aleman, americano
+  
+  // Lista de pagos extraordinarios programados
+  // { period: number, amount: number, recurring: boolean }
+  const [extraPayments, setExtraPayments] = useState([]);
+  const [newExtraPeriod, setNewExtraPeriod] = useState(1);
+  const [newExtraAmount, setNewExtraAmount] = useState('');
+  const [newExtraRecurring, setNewExtraRecurring] = useState(false);
+
+  // Simulaciones Guardadas para comparar
+  const [savedSimulations, setSavedSimulations] = useState([]);
+  const [activeTab, setActiveTab] = useState('resumen'); // resumen, tabla, grafico, comparador
+
+  // --- Configuraciones de Frecuencia ---
+  const frequencyOptions = {
+    quincenal: { label: 'Quincenal (24/año)', periodsPerYear: 24 },
+    mensual: { label: 'Mensual (12/año)', periodsPerYear: 12 },
+    trimestral: { label: 'Trimestral (4/año)', periodsPerYear: 4 },
+    semestral: { label: 'Semestral (2/año)', periodsPerYear: 2 },
+    anual: { label: 'Anual (1/año)', periodsPerYear: 1 }
+  };
+
+  // --- Cálculos de Periodos y Tasas ---
+  const totalPeriodsCalculated = useMemo(() => {
+    const factor = termUnit === 'años' ? frequencyOptions[frequency].periodsPerYear : 1;
+    if (termUnit === 'años') {
+      return term * factor;
+    }
+    // Si el plazo está en meses, convertimos según la frecuencia seleccionada
+    const totalMonths = term;
+    const monthsPerPeriod = 12 / frequencyOptions[frequency].periodsPerYear;
+    return Math.max(1, Math.round(totalMonths / monthsPerPeriod));
+  }, [term, termUnit, frequency]);
+
+  const periodicRate = useMemo(() => {
+    const rateDecimal = annualRate / 100;
+    return rateDecimal / frequencyOptions[frequency].periodsPerYear;
+  }, [annualRate, frequency]);
+
+  // --- Generador de la Tabla de Amortización ---
+  const schedule = useMemo(() => {
+    let balance = parseFloat(loanAmount);
+    if (isNaN(balance) || balance <= 0 || isNaN(periodicRate) || periodicRate < 0 || totalPeriodsCalculated <= 0) {
+      return [];
+    }
+
+    const n = totalPeriodsCalculated;
+    const r = periodicRate;
+    const resultTable = [];
+
+    // Mapear pagos extraordinarios para búsqueda rápida
+    const extraMap = {};
+    extraPayments.forEach(p => {
+      const periodNum = parseInt(p.period);
+      if (!isNaN(periodNum) && periodNum > 0) {
+        if (p.recurring) {
+          // Si es recurrente, aplica desde ese periodo en adelante
+          extraMap[periodNum] = { amount: parseFloat(p.amount), recurring: true };
+        } else {
+          extraMap[periodNum] = { amount: parseFloat(p.amount), recurring: false };
+        }
+      }
+    });
+
+    let cumulativeInterest = 0;
+    let cumulativePrincipal = 0;
+
+    for (let i = 1; i <= n && balance > 0.01; i++) {
+      let interest = balance * r;
+      let principal = 0;
+      let payment = 0;
+
+      // Calcular pago según sistema de amortización
+      if (system === 'frances') {
+        // Cuota constante (Fórmula de renta de amortización)
+        if (r === 0) {
+          payment = balance / (n - i + 1);
+        } else {
+          payment = (balance * r) / (1 - Math.pow(1 + r, -(n - i + 1)));
+        }
+        principal = payment - interest;
+      } else if (system === 'aleman') {
+        // Amortización constante
+        principal = parseFloat(loanAmount) / n;
+        // Ajustar el último periodo o si excede el balance restante
+        if (principal > balance) {
+          principal = balance;
+        }
+        payment = principal + interest;
+      } else if (system === 'americano') {
+        // Solo intereses durante el plazo, capital al final
+        if (i === n) {
+          principal = parseFloat(loanAmount);
+          payment = principal + interest;
+        } else {
+          principal = 0;
+          payment = interest;
+        }
+      }
+
+      // Asegurar que el principal amortizado no exceda el saldo actual
+      if (principal > balance) {
+        principal = balance;
+        payment = principal + interest;
+      }
+
+      // Procesar abono extraordinario programado
+      let extraPaid = 0;
+      // Verificar recurrencia activa para este periodo
+      const exactMatch = extraMap[i];
+      if (exactMatch && !exactMatch.recurring) {
+        extraPaid = exactMatch.amount;
+      } else {
+        // Buscar si hay algún abono recurrente configurado que empiece antes o en este periodo
+        const matchingRecurringKeys = Object.keys(extraMap)
+          .map(Number)
+          .filter(k => k <= i && extraMap[k].recurring);
+        if (matchingRecurringKeys.length > 0) {
+          // Aplicamos el abono recurrente del periodo inicial más reciente
+          const activeKey = Math.max(...matchingRecurringKeys);
+          extraPaid = extraMap[activeKey].amount;
+        }
+      }
+
+      // Limitar abono extraordinario para no dejar saldo negativo
+      if (extraPaid > (balance - principal)) {
+        extraPaid = Math.max(0, balance - principal);
+      }
+
+      const totalAmortizedThisPeriod = principal + extraPaid;
+      const initialBalance = balance;
+      balance = balance - totalAmortizedThisPeriod;
+
+      cumulativeInterest += interest;
+      cumulativePrincipal += totalAmortizedThisPeriod;
+
+      resultTable.push({
+        period: i,
+        initialBalance,
+        payment: payment,
+        interest: interest,
+        principal: principal,
+        extraPayment: extraPaid,
+        totalPayment: payment + extraPaid,
+        finalBalance: Math.max(0, balance),
+        cumulativeInterest,
+        cumulativePrincipal
+      });
+    }
+
+    return resultTable;
+  }, [loanAmount, annualRate, totalPeriodsCalculated, periodicRate, system, extraPayments]);
+
+  // --- Resumen de Métricas ---
+  const summary = useMemo(() => {
+    if (schedule.length === 0) return { totalPaid: 0, totalInterest: 0, realTerm: 0, monthlyAverage: 0 };
+    
+    const totalPaid = schedule.reduce((sum, row) => sum + row.totalPayment, 0);
+    const totalInterest = schedule.reduce((sum, row) => sum + row.interest, 0);
+    const realTerm = schedule.length;
+    const monthlyAverage = totalPaid / realTerm;
+
+    return {
+      totalPaid,
+      totalInterest,
+      realTerm,
+      monthlyAverage
+    };
+  }, [schedule]);
+
+  // --- Funciones para Pagos Extraordinarios ---
+  const handleAddExtraPayment = (e) => {
+    e.preventDefault();
+    const amount = parseFloat(newExtraAmount);
+    if (isNaN(amount) || amount <= 0 || isNaN(newExtraPeriod) || newExtraPeriod < 1) {
+      return;
+    }
+    
+    // Evitar duplicados para el mismo periodo
+    const exists = extraPayments.some(p => p.period === newExtraPeriod);
+    if (exists) {
+      alert("Ya existe una regla de abono extraordinario configurada para este periodo.");
+      return;
+    }
+
+    setExtraPayments([
+      ...extraPayments,
+      { period: newExtraPeriod, amount, recurring: newExtraRecurring }
+    ].sort((a, b) => a.period - b.period));
+
+    setNewExtraAmount('');
+    setNewExtraRecurring(false);
+  };
+
+  const handleRemoveExtraPayment = (index) => {
+    const updated = [...extraPayments];
+    updated.splice(index, 1);
+    setExtraPayments(updated);
+  };
+
+  // --- Guardar Simulación para Comparación ---
+  const saveSimulation = () => {
+    const name = `Simulación ${savedSimulations.length + 1} (${system.toUpperCase()} - ${loanAmount.toLocaleString('es-ES')} a ${annualRate}%)`;
+    const newSim = {
+      id: Date.now(),
+      name,
+      system,
+      loanAmount,
+      annualRate,
+      term,
+      termUnit,
+      frequency,
+      totalPaid: summary.totalPaid,
+      totalInterest: summary.totalInterest,
+      realTerm: summary.realTerm,
+      scheduleLength: schedule.length
+    };
+    setSavedSimulations([...savedSimulations, newSim]);
+    setActiveTab('comparador');
+  };
+
+  const removeSavedSimulation = (id) => {
+    setSavedSimulations(savedSimulations.filter(s => s.id !== id));
+  };
+
+  // --- Exportar como CSV ---
+  const exportToCSV = () => {
+    if (schedule.length === 0) return;
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Periodo,Saldo Inicial,Cuota Base,Intereses,Capital Pagado,Abono Extra,Pago Total,Saldo Final\n";
+    
+    schedule.forEach(row => {
+      csvContent += `${row.period},${row.initialBalance.toFixed(2)},${row.payment.toFixed(2)},${row.interest.toFixed(2)},${row.principal.toFixed(2)},${row.extraPayment.toFixed(2)},${row.totalPayment.toFixed(2)},${row.finalBalance.toFixed(2)}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Tabla_Amortizacion_${system}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Formateador de moneda interna
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(val);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-md">
+        <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between">
+          <div className="flex items-center space-x-3 mb-4 sm:mb-0">
+            <span className="p-2 bg-white/10 rounded-lg">
+              <Icons.Calculator />
+            </span>
+            <div>
+              <h1 className="text-2xl font-bold tracking-wide">MultiAmortiza</h1>
+              <p className="text-xs text-blue-200">Simulador Avanzado de Créditos y Amortización</p>
+            </div>
+          </div>
+          <div className="text-xs text-right hidden md:block">
+            <p>Sistemas: Francés (Francés), Alemán (Capital Constante), Americano</p>
+            <p>Monitoreo y Simulación Financiera Interactiva</p>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Panel de Entradas (Sidebar Izquierdo) */}
+          <section className="lg:col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+            <div className="border-b border-slate-100 pb-3">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                ⚙️ Configurar Préstamo
+              </h2>
+            </div>
+
+            {/* Monto del Préstamo */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Monto del Préstamo
+              </label>
+              <div className="relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-slate-500 sm:text-sm">$</span>
+                </div>
+                <input
+                  type="number"
+                  min="100"
+                  step="100"
+                  className="block w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-lg font-semibold"
+                  value={loanAmount}
+                  onChange={(e) => setLoanAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                />
+              </div>
+            </div>
+
+            {/* Tasa de Interés */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Tasa de Interés Anual (E.A. % )
+              </label>
+              <div className="relative rounded-md shadow-sm">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  className="block w-full pr-12 py-2 pl-3 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-medium"
+                  value={annualRate}
+                  onChange={(e) => setAnnualRate(Math.max(0, parseFloat(e.target.value) || 0))}
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-slate-500 sm:text-sm">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Plazo / Duración */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Plazo
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="block w-full py-2 px-3 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  value={term}
+                  onChange={(e) => setTerm(Math.max(1, parseInt(e.target.value) || 1))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Unidad
+                </label>
+                <select
+                  className="block w-full py-2 px-3 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  value={termUnit}
+                  onChange={(e) => setTermUnit(e.target.value)}
+                >
+                  <option value="meses">Meses</option>
+                  <option value="años">Años</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Frecuencia de Pago */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Frecuencia de Pago
+              </label>
+              <select
+                className="block w-full py-2 px-3 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+              >
+                {Object.entries(frequencyOptions).map(([key, opt]) => (
+                  <option key={key} value={key}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sistema de Amortización */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Sistema de Amortización
+              </label>
+              <select
+                className="block w-full py-2 px-3 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white font-semibold text-blue-800"
+                value={system}
+                onChange={(e) => setSystem(e.target.value)}
+              >
+                <option value="frances">Sistema Francés (Cuota Fija)</option>
+                <option value="aleman">Sistema Alemán (Amortización Constante)</option>
+                <option value="americano">Sistema Americano (Pago único final)</option>
+              </select>
+              <p className="mt-2 text-xs text-slate-500 italic">
+                {system === 'frances' && "💡 Las cuotas totales son siempre iguales, pagando más intereses al inicio."}
+                {system === 'aleman' && "💡 El capital pagado es fijo, por lo tanto tus cuotas van disminuyendo con el tiempo."}
+                {system === 'americano' && "💡 Solo pagas intereses periódicamente; el capital total se devuelve en la última cuota."}
+              </p>
+            </div>
+
+            {/* Panel de Pagos Extraordinarios */}
+            <div className="border-t border-slate-200 pt-4 space-y-3">
+              <h3 className="text-sm font-bold text-slate-950 flex items-center justify-between">
+                <span>➕ Abonos Extraordinarios</span>
+                <span className="text-xs font-normal text-slate-500">Acelera tu pago</span>
+              </h3>
+              
+              <form onSubmit={handleAddExtraPayment} className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Monto del Abono</label>
+                  <input
+                    type="number"
+                    placeholder="Eje: 500"
+                    className="block w-full py-1.5 px-2.5 bg-white border border-slate-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    value={newExtraAmount}
+                    onChange={(e) => setNewExtraAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Periodo Inicial</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalPeriodsCalculated}
+                    className="block w-full py-1.5 px-2.5 bg-white border border-slate-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    value={newExtraPeriod}
+                    onChange={(e) => setNewExtraPeriod(Math.max(1, parseInt(e.target.value) || 1))}
+                  />
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="inline-flex items-center text-xs text-slate-700 h-8 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-2"
+                      checked={newExtraRecurring}
+                      onChange={(e) => setNewExtraRecurring(e.target.checked)}
+                    />
+                    ¿Recurrente?
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  className="col-span-2 mt-2 bg-blue-600 text-white py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition flex items-center justify-center gap-1"
+                >
+                  <Icons.Plus /> Agregar Programación
+                </button>
+              </form>
+
+              {/* Lista de abonos actuales */}
+              {extraPayments.length > 0 && (
+                <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                  {extraPayments.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-xs bg-blue-50/70 border border-blue-100 p-2 rounded-md">
+                      <div>
+                        <span className="font-semibold text-blue-950">{formatCurrency(p.amount)}</span>
+                        <span className="text-slate-500"> - Periodo {p.period} {p.recurring ? '(Recurrente)' : '(Único)'}</span>
+                      </div>
+                      <button 
+                        onClick={() => handleRemoveExtraPayment(idx)}
+                        className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
+                        title="Eliminar abono"
+                      >
+                        <Icons.Trash />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={saveSimulation}
+              className="w-full bg-slate-800 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-slate-900 transition flex items-center justify-center gap-2"
+            >
+              <Icons.Compare /> Guardar en Comparador
+            </button>
+          </section>
+
+          {/* Panel de Resultados (Tabs y Visualización) */}
+          <section className="lg:col-span-8 flex flex-col space-y-6">
+            
+            {/* Tarjetas de Resumen Rápido */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <span className="text-xs text-slate-500 font-medium block mb-1">Monto Solicitado</span>
+                <span className="text-lg md:text-xl font-bold text-slate-900">{formatCurrency(loanAmount)}</span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+                <span className="text-xs text-slate-500 font-medium block mb-1">Total Intereses</span>
+                <span className="text-lg md:text-xl font-bold text-red-600">{formatCurrency(summary.totalInterest)}</span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+                <span className="text-xs text-slate-500 font-medium block mb-1">Costo Total Pagado</span>
+                <span className="text-lg md:text-xl font-bold text-emerald-600">{formatCurrency(summary.totalPaid)}</span>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <span className="text-xs text-slate-500 font-medium block mb-1">Plazo Real</span>
+                <span className="text-lg md:text-xl font-bold text-indigo-700">{summary.realTerm} {frequency}s</span>
+              </div>
+            </div>
+
+            {/* Navegación por Tabs */}
+            <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl shadow-sm">
+              <button
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${
+                  activeTab === 'resumen'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                onClick={() => setActiveTab('resumen')}
+              >
+                <Icons.TrendingDown /> Resumen
+              </button>
+              <button
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${
+                  activeTab === 'tabla'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                onClick={() => setActiveTab('tabla')}
+              >
+                <Icons.Table /> Tabla Amortización
+              </button>
+              <button
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${
+                  activeTab === 'grafico'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                onClick={() => setActiveTab('grafico')}
+              >
+                <Icons.ChartBar /> Gráfico
+              </button>
+              <button
+                className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition relative flex items-center justify-center gap-2 ${
+                  activeTab === 'comparador'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                onClick={() => setActiveTab('comparador')}
+              >
+                <Icons.Compare /> Comparador
+                {savedSimulations.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {savedSimulations.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Contenido de los Tabs */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 min-h-[400px]">
+              
+              {/* TAB 1: RESUMEN ANALÍTICO */}
+              {activeTab === 'resumen' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">Análisis Técnico del Crédito</h3>
+                    <p className="text-sm text-slate-600">
+                      Este es el desglose general de tu préstamo utilizando el sistema <strong className="text-blue-600 capitalize">{system}</strong>.
+                    </p>
+                  </div>
+
+                  {/* Comparación visual simple */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Distribución del Pago</h4>
+                    <div className="h-6 w-full bg-slate-200 rounded-full overflow-hidden flex">
+                      <div 
+                        className="bg-blue-600 h-full flex items-center justify-center text-[10px] text-white font-bold transition-all duration-500"
+                        style={{ width: `${(loanAmount / summary.totalPaid) * 100 || 100}%` }}
+                      >
+                        Capital ({( (loanAmount / (summary.totalPaid || 1)) * 100 ).toFixed(1)}%)
+                      </div>
+                      <div 
+                        className="bg-red-500 h-full flex items-center justify-center text-[10px] text-white font-bold transition-all duration-500"
+                        style={{ width: `${(summary.totalInterest / summary.totalPaid) * 100 || 0}%` }}
+                      >
+                        Interés ({( (summary.totalInterest / (summary.totalPaid || 1)) * 100 ).toFixed(1)}%)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Diagnóstico Financiero */}
+                  <div className="border border-blue-100 bg-blue-50/50 p-4 rounded-xl">
+                    <h4 className="text-sm font-bold text-blue-900 mb-2">📢 Consejos de este escenario:</h4>
+                    <ul className="text-xs text-blue-950 space-y-2 list-disc list-inside">
+                      <li>Estás pagando <strong>{(summary.totalInterest / loanAmount * 100).toFixed(1)}%</strong> sobre el capital solicitado en puros intereses.</li>
+                      {system === 'frances' && (
+                        <li>El sistema Francés te brinda estabilidad al pagar siempre lo mismo, pero el capital inicial decrece de manera más lenta.</li>
+                      )}
+                      {system === 'aleman' && (
+                        <li>Con el sistema Alemán ahorras intereses globales con respecto al Francés, pero tus primeras cuotas serán significativamente más altas.</li>
+                      )}
+                      {system === 'americano' && (
+                        <li>El sistema Americano es muy riesgoso a largo plazo; asegúrate de tener liquidez completa para la última cuota para evitar impagos.</li>
+                      )}
+                      {extraPayments.length > 0 && (
+                        <li className="text-emerald-700 font-bold">¡Excelente! Estás programando abonos extraordinarios. Esto reduce el pago total de intereses y disminuye el plazo efectivo del préstamo.</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  {/* Detalle Cuota Inicial vs Final */}
+                  {schedule.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                      <div className="border border-slate-200 rounded-xl p-4">
+                        <span className="text-xs font-semibold text-slate-500 block mb-1">💵 Primera Cuota Total</span>
+                        <div className="text-2xl font-extrabold text-slate-800">
+                          {formatCurrency(schedule[0].totalPayment)}
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          (Capital: {formatCurrency(schedule[0].principal)} + Interés: {formatCurrency(schedule[0].interest)})
+                        </p>
+                      </div>
+                      <div className="border border-slate-200 rounded-xl p-4">
+                        <span className="text-xs font-semibold text-slate-500 block mb-1">🏁 Última Cuota Total</span>
+                        <div className="text-2xl font-extrabold text-slate-800">
+                          {formatCurrency(schedule[schedule.length - 1].totalPayment)}
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          (Capital: {formatCurrency(schedule[schedule.length - 1].principal)} + Interés: {formatCurrency(schedule[schedule.length - 1].interest)})
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: TABLA DE AMORTIZACIÓN DETALLADA */}
+              {activeTab === 'tabla' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">Historial Detallado Periodo a Periodo</h3>
+                      <p className="text-xs text-slate-500">Muestra los pagos, amortizaciones, abonos extraordinarios y saldos remanentes.</p>
+                    </div>
+                    <button
+                      onClick={exportToCSV}
+                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1.5"
+                    >
+                      <Icons.Download /> Exportar Excel/CSV
+                    </button>
+                  </div>
+
+                  {/* Tabla Scrollable */}
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 border-b border-slate-200 font-semibold">
+                          <th className="py-3 px-4">#</th>
+                          <th className="py-3 px-4">Saldo Pendiente</th>
+                          <th className="py-3 px-4 text-indigo-700">Cuota Base</th>
+                          <th className="py-3 px-4 text-red-600">Intereses</th>
+                          <th className="py-3 px-4">Principal Amort.</th>
+                          <th className="py-3 px-4 text-emerald-600">Abono Extra</th>
+                          <th className="py-3 px-4 text-slate-900">Total Cuota</th>
+                          <th className="py-3 px-4">Saldo Final</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {schedule.map((row) => (
+                          <tr key={row.period} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2.5 px-4 font-bold text-slate-500">{row.period}</td>
+                            <td className="py-2.5 px-4">{formatCurrency(row.initialBalance)}</td>
+                            <td className="py-2.5 px-4 font-medium text-indigo-700">{formatCurrency(row.payment)}</td>
+                            <td className="py-2.5 px-4 text-red-600">{formatCurrency(row.interest)}</td>
+                            <td className="py-2.5 px-4">{formatCurrency(row.principal)}</td>
+                            <td className="py-2.5 px-4 text-emerald-600 font-semibold">{row.extraPayment > 0 ? formatCurrency(row.extraPayment) : '-'}</td>
+                            <td className="py-2.5 px-4 font-bold text-slate-900">{formatCurrency(row.totalPayment)}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-600">{formatCurrency(row.finalBalance)}</td>
+                          </tr>
+                        ))}
+                        {schedule.length === 0 && (
+                          <tr>
+                            <td colSpan="8" className="text-center py-8 text-slate-400">Introduce valores válidos para generar la tabla.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: GRÁFICO DE AMORTIZACIÓN */}
+              {activeTab === 'grafico' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Evolución Gráfica del Crédito</h3>
+                    <p className="text-xs text-slate-500">Representación de la reducción del saldo y el crecimiento de los intereses acumulados.</p>
+                  </div>
+
+                  {schedule.length > 0 ? (
+                    <div className="space-y-4">
+                      {/* Gráfico SVG Autogestionado */}
+                      <div className="relative w-full h-64 border border-slate-200 rounded-xl bg-slate-50 p-2">
+                        {/* Líneas de Guía */}
+                        <div className="absolute inset-x-0 top-1/4 border-b border-slate-200/50 text-[9px] text-slate-400 pl-2">75% Saldo</div>
+                        <div className="absolute inset-x-0 top-2/4 border-b border-slate-200/50 text-[9px] text-slate-400 pl-2">50% Saldo</div>
+                        <div className="absolute inset-x-0 top-3/4 border-b border-slate-200/50 text-[9px] text-slate-400 pl-2">25% Saldo</div>
+
+                        <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+                          {/* Polígono para el Saldo Pendiente (Área Azul) */}
+                          <path
+                            d={`
+                              M 0,200
+                              ${schedule.map((row, index) => {
+                                const x = (index / (schedule.length - 1)) * 500;
+                                const y = 200 - (row.finalBalance / loanAmount) * 200;
+                                return `L ${x},${y}`;
+                              }).join(' ')}
+                              L 500,200 Z
+                            `}
+                            fill="rgba(59, 130, 246, 0.15)"
+                            stroke="#3b82f6"
+                            strokeWidth="2.5"
+                          />
+
+                          {/* Polígono para Intereses Acumulados (Línea Roja) */}
+                          <path
+                            d={schedule.map((row, index) => {
+                              const x = (index / (schedule.length - 1)) * 500;
+                              // Normalizado respecto al interés acumulado final
+                              const y = 200 - (row.cumulativeInterest / summary.totalInterest) * 200;
+                              return `${index === 0 ? 'M' : 'L'} ${x},${y}`;
+                            }).join(' ')}
+                            fill="none"
+                            stroke="#ef4444"
+                            strokeWidth="2.5"
+                            strokeDasharray="4 2"
+                          />
+                        </svg>
+                      </div>
+
+                      {/* Leyendas */}
+                      <div className="flex justify-center gap-6 text-xs font-semibold">
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-3 bg-blue-500 rounded"></span>
+                          <span>Saldo Restante de Capital</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-0.5 border-t-2 border-dashed border-red-500"></span>
+                          <span>Intereses Totales Pagados (Acumulado)</span>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1 text-slate-600">
+                        <p><strong>💡 ¿Cómo leer el gráfico?</strong></p>
+                        <p>La curva azul desciende a medida que pagas tu deuda. Si realizas abonos anticipados, verás una caída mucho más abrupta. La línea punteada roja sube, indicando el total del dinero que se lleva el banco por el préstamo.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 text-slate-400">No hay datos suficientes para trazar la gráfica.</div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: COMPARADOR DE ESCENARIOS */}
+              {activeTab === 'comparador' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Comparador Multiescenario</h3>
+                    <p className="text-xs text-slate-500">Compara cuotas, tasas e intereses para elegir el esquema óptimo.</p>
+                  </div>
+
+                  {savedSimulations.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {savedSimulations.map((sim) => (
+                        <div key={sim.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between space-y-3 relative">
+                          <button
+                            onClick={() => removeSavedSimulation(sim.id)}
+                            className="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white shadow-sm p-1.5 rounded-full"
+                            title="Eliminar de la lista"
+                          >
+                            <Icons.Trash />
+                          </button>
+                          
+                          <div>
+                            <span className="text-[10px] font-bold text-blue-600 uppercase bg-blue-100/50 px-2.5 py-1 rounded-md">
+                              Sistema: {sim.system}
+                            </span>
+                            <h4 className="font-bold text-slate-900 text-sm mt-2">{sim.name}</h4>
+                          </div>
+
+                          <div className="space-y-1.5 text-xs text-slate-600">
+                            <div className="flex justify-between">
+                              <span>Préstamo:</span>
+                              <span className="font-semibold text-slate-900">{formatCurrency(sim.loanAmount)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Interés (A.E.):</span>
+                              <span className="font-semibold text-slate-900">{sim.annualRate}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Plazo Configurado:</span>
+                              <span className="font-semibold text-slate-900">{sim.term} {sim.termUnit}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-slate-200 pt-1">
+                              <span className="font-semibold">Plazo Efectivo:</span>
+                              <span className="font-bold text-blue-600">{sim.realTerm} cuotas</span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-200 pb-1">
+                              <span className="font-semibold">Total Intereses:</span>
+                              <span className="font-bold text-red-600">{formatCurrency(sim.totalInterest)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-slate-900">
+                              <span>Total Pagado:</span>
+                              <span className="text-emerald-700">{formatCurrency(sim.totalPaid)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 border-2 border-dashed border-slate-200 rounded-xl space-y-3">
+                      <p className="text-slate-400 text-sm">Aún no has guardado ninguna simulación.</p>
+                      <p className="text-xs text-slate-500">Configura tus variables en el panel de la izquierda y haz clic en "Guardar en Comparador" para comparar varios créditos.</p>
+                    </div>
+                  )}
+
+                  {savedSimulations.length > 1 && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-xs text-emerald-950">
+                      <strong>✨ Tip del Comparador:</strong> Revisa el campo de <strong>Total Intereses</strong> para identificar cuál opción te cuesta menos dinero de forma integral, o compara el <strong>Plazo Efectivo</strong> si has programado abonos extraordinarios.
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-slate-400 py-8 border-t border-slate-800 mt-16">
+        <div className="max-w-7xl mx-auto px-4 text-center space-y-2">
+          <p className="text-sm font-semibold">MultiAmortiza App - El control financiero en tus manos</p>
+          <p className="text-xs">Los cálculos presentados son simulaciones de carácter informativo y no constituyen una oferta formal de ningún banco. Las tasas efectivas pueden variar según la entidad.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
